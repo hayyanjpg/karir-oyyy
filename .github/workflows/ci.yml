@@ -1,0 +1,94 @@
+name: KarirTrack CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: karirtrack_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint with Ruff
+        working-directory: ./backend
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Run Pytest
+        working-directory: ./backend
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/karirtrack_test
+          DATABASE_URL_DIRECT: postgresql+psycopg://postgres:postgres@localhost:5432/karirtrack_test
+          JWT_SECRET_KEY: test_secret_key_for_ci_pipeline_only_32
+          GOOGLE_CLIENT_ID: test_google_client_id
+          COOKIE_SECURE: 'false'
+          CORS_ORIGINS: http://localhost:5173
+        run: pytest -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Test
+        working-directory: ./frontend
+        run: npm run test:run
+
+      - name: Build
+        working-directory: ./frontend
+        env:
+          VITE_API_BASE_URL: /api/v1
+          VITE_GOOGLE_CLIENT_ID: test_google_client_id
+        run: npm run build
