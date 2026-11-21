@@ -6,7 +6,7 @@ from openpyxl.utils import get_column_letter
 
 from app.models import JobApplication, User
 from app.schemas.analytics import KpiSummary
-from app.services.report_common import now_wib
+from app.services.report_common import now_wib, to_wib_naive
 
 HEADER_FILL = PatternFill("solid", fgColor="0F172A")
 HEADER_FONT = Font(bold=True, color="FFFFFF", size=10)
@@ -82,7 +82,7 @@ def build_excel_report(
                 application.salary_range or "-",
                 application.job_url or "-",
                 application.notes or "-",
-                application.updated_at,
+                to_wib_naive(application.updated_at),
             ]
         )
         row = worksheet.max_row

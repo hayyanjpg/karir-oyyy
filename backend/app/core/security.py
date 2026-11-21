@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -26,6 +27,8 @@ def _encode_token(user_id: UUID, token_version: int, token_type: str, lifetime: 
         "sub": str(user_id),
         "type": token_type,
         "ver": token_version,
+        # jti keeps tokens unique even when two are issued within the same second.
+        "jti": str(uuid.uuid4()),
         "iat": now,
         "exp": now + lifetime,
     }
